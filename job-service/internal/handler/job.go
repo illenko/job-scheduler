@@ -34,10 +34,12 @@ func (h *JobHandler) CreateJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.service.CreateJob(context.Background(), job); err != nil {
+	createdJob, err := h.service.CreateJob(context.Background(), job)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(createdJob)
 }

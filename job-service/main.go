@@ -32,7 +32,8 @@ func main() {
 	defer dbpool.Close()
 
 	jobRepo := repository.NewJobRepository(dbpool)
-	jobService := service.NewJobService(jobRepo)
+	jobScheduleRepo := repository.NewJobScheduleRepository(dbpool)
+	jobService := service.NewJobService(jobRepo, jobScheduleRepo)
 	jobHandler := handler.NewJobHandler(jobService)
 
 	http.HandleFunc("POST /jobs", jobHandler.CreateJob)

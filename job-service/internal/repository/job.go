@@ -15,7 +15,7 @@ func NewJobRepository(dbpool *pgxpool.Pool) *JobRepository {
 }
 
 func (r *JobRepository) GetJobs(ctx context.Context) ([]model.Job, error) {
-	rows, err := r.dbpool.Query(ctx, "SELECT id, create_time, user_id, status, recurring, interval, retry_count FROM job")
+	rows, err := r.dbpool.Query(ctx, "SELECT id, create_time, user_id, recurring, interval, retry_count FROM job")
 	if err != nil {
 		return nil, err
 	}
@@ -24,7 +24,7 @@ func (r *JobRepository) GetJobs(ctx context.Context) ([]model.Job, error) {
 	var jobs []model.Job
 	for rows.Next() {
 		var job model.Job
-		if err := rows.Scan(&job.ID, &job.CreateTime, &job.UserID, &job.Status, &job.Recurring, &job.Interval, &job.RetryCount); err != nil {
+		if err := rows.Scan(&job.ID, &job.CreateTime, &job.UserID, &job.Recurring, &job.Interval, &job.RetryCount); err != nil {
 			return nil, err
 		}
 		jobs = append(jobs, job)
@@ -32,8 +32,12 @@ func (r *JobRepository) GetJobs(ctx context.Context) ([]model.Job, error) {
 	return jobs, nil
 }
 
-func (r *JobRepository) CreateJob(ctx context.Context, job model.Job) error {
-	_, err := r.dbpool.Exec(ctx, "INSERT INTO job (create_time, user_id, status, recurring, interval, retry_count) VALUES (NOW(), $1, $2, $3, $4, $5)",
-		job.UserID, job.Status, job.Recurring, job.Interval, job.RetryCount)
-	return err
+func (r *JobRepository) CreateJob(ctx context.Context, job *model.Job) error {
+	err := r.dbpool.QueryRow(ctx,
+		"INSERT INTO job (create_time, user_id, recurring, interval, retry_count) VALUES (NOW(), $1, $2, $3, $4) RETURNING id, create_time",
+		job.UserID, job.Recurring, job.Interval, job.RetryCount).Scan(&job.ID, &job.CreateTime)
+	if err != nil {
+		return err
+	}
+	return nil
 }
