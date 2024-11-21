@@ -42,38 +42,32 @@ services:
     depends_on:
       - kafka
 
-  connect:
-    image: confluentinc/cp-server-connect:7.5.2
-    container_name: connect
+  ksqldb-server:
+    image: confluentinc/ksqldb-server:latest
     ports:
-      - "8083:8083"
+      - "8088:8088"
+    command: [ "/etc/ksqldb-server/run.sh" ]
     environment:
-      CONNECT_BOOTSTRAP_SERVERS: kafka:9092
-      CONNECT_GROUP_ID: "kafka-connect"
-      CONNECT_REST_ADVERTISED_HOST_NAME: connect
+      - KSQL_BOOTSTRAP_SERVERS=kafka:9092
+      - KSQL_KSQL_SCHEMA_REGISTRY_URL=http://schema-registry:8081
+      - KSQL_KSQL_LOGGING_PROCESSING_STREAM_AUTO_CREATE=true
+      - KSQL_KSQL_LOGGING_PROCESSING_TOPIC_AUTO_CREATE=true
+      - KSQL_CONNECT_WORKER_CONFIG=/etc/ksqldb-server/connect.properties
+    depends_on:
+      - kafka
+      - schema-registry
+    volumes:
+      - ./files/ksqldb-server:/etc/ksqldb-server
 
-      CONNECT_CONFIG_STORAGE_TOPIC: _connect-configs
-      CONNECT_OFFSET_STORAGE_TOPIC: _connect-offsets
-      CONNECT_STATUS_STORAGE_TOPIC: _connect-statuses
-
-      CONNECT_REPLICATION_FACTOR: 1
-      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
-      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
-      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
-
-      CONNECT_KEY_CONVERTER: org.apache.kafka.connect.storage.StringConverter
-      CONNECT_VALUE_CONVERTER: io.confluent.connect.avro.AvroConverter
-      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
-      CLASSPATH: "/usr/share/java/monitoring-interceptors/monitoring-interceptors-7.5.2.jar"
-      CONNECT_PLUGIN_PATH: '/usr/share/java,/usr/share/confluent-hub-components/,/connectors/'
-    command:
-      - bash
-      - -c
-      - |
-        echo "Installing connector plugins"
-        confluent-hub install --no-prompt debezium/debezium-connector-postgresql:2.2.1
-        echo "Launching Kafka Connect worker"
-        /etc/confluent/docker/run
+  ksqldb-cli:
+    image: confluentinc/ksqldb-cli:latest
+    container_name: ksqldb-cli
+    depends_on:
+      - ksqldb-server
+    entrypoint: /bin/sh
+    tty: true
+    volumes:
+      - ./files/ksqldb-cli:/etc/sql
 
   akhq:
     image: tchiotludo/akhq
@@ -87,9 +81,10 @@ services:
                 bootstrap.servers: "kafka:9092"
               schema-registry:
                 url: "http://schema-registry:8081"
-              connect:
-                - name: "connect"
-                  url: "http://connect:8083"
+              ksqldb:
+                - name: "ksqldb"
+                  url: "http://ksqldb-server:8088"
+
     depends_on:
       - kafka
       - schema-registry
